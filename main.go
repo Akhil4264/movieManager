@@ -6,8 +6,13 @@ import (
 	"net/http"
 
 	handler "github.com/Akhil4264/movieManager/handlers"
+	connection "github.com/Akhil4264/movieManager/connections"
 	"github.com/gorilla/mux"
 )
+
+func init(){
+	connection.Connect()
+}
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "server is up and running")
