@@ -1,10 +1,43 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
+	// "io"
 	"net/http"
+
+	movieRepository "github.com/Akhil4264/movieManager/Repositories/movieRepository"
 )
 
+type searchMovieQuery struct{
+	SearchQuery string
+	YearQuery int
+	Page int
+}
+
 func GetMovieByQuery(w http.ResponseWriter , r *http.Request){
-	fmt.Fprintf(w,"Accessing movie by reference...")
+	var searchq searchMovieQuery
+	err := json.NewDecoder(r.Body).Decode(&searchq)
+	if(err != nil){
+		fmt.Println("error acccessing data from req : ",err)
+	}
+	mveres,err := movieRepository.GetMoviesByQuery(searchq.SearchQuery,searchq.YearQuery,searchq.Page)
+	if(err != nil){
+		fmt.Println("error getting response from api : ",err)
+	}
+	err = json.NewEncoder(w).Encode(mveres)
+	if(err != nil){
+		fmt.Println("error secind response : ",err)
+	}
+}
+
+func GetMovieById(w http.ResponseWriter,r *http.Request){
+	movie,err := movieRepository.GetMovieById("tt0499549")
+	if(err != nil){
+		fmt.Println("error getting movie by id : ",err)
+	}
+	json.NewEncoder(w).Encode(*movie)
+}
+func AddMovie(w http.ResponseWriter , r *http.Request){
+	fmt.Fprintf(w,"Adding movie to table")
 }

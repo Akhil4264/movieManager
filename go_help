@@ -1,0 +1,65 @@
+json.marshall -- any -> []byte
+json.unmarshall -- []byte -> any
+
+
+json.newencoder().encode() -- (w,any) --> send json encoded message in response to reader of w
+
+r.Body -- io.readCloser()
+
+to read it use io.ReadAll(r.Body)
+
+
+
+
+To read request : 
+    -> Body
+        1. io.readAll(r.Body)  -->  []byte,err
+            json.unmarshall(r.Body,&res)
+        2. json.newDecoder(r.Body).decode(&res)  --> err
+
+
+
+    -> Headers
+
+        w.writeHeader()
+
+
+
+    -> Cookies
+
+        cookie := http.Cookie{}
+
+
+
+
+
+
+To send a Response : 
+    -> send basic response
+
+        fmt.FprintF(w,"<your message>")
+
+
+
+    -> send json response
+        1.
+           msg,err := json.marshall(...)
+            fmt.FprintF(w,msg)
+
+        2. 
+            json.newencoder(w).encode(data)
+
+
+
+    -> attach a header 
+        
+
+
+
+
+
+    -> attach a session Cookie
+
+
+
+

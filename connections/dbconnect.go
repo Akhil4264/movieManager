@@ -9,7 +9,7 @@ import (
 	_ "github.com/lib/pq"
 )
 
-var db *sqlx.DB
+var DB *sqlx.DB
 
 func Connect(){
 	err := godotenv.Load(".env")
@@ -25,14 +25,12 @@ func Connect(){
 
 	dataSource := fmt.Sprintf("user=%s dbname=%s sslmode=disable password=%s host=%s", dbUser, dbName, dbPass, dbHost)
 
-	db,err = sqlx.Connect("postgres",dataSource)
+	DB,err = sqlx.Connect("postgres",dataSource)
 
     if err != nil {
         log.Fatalln(err)
     }
-  
-    defer db.Close()
-    if err := db.Ping(); err != nil {
+    if err := DB.Ping(); err != nil {
         log.Fatal("Error  connecting to DB : ",err)
     } else {
         log.Println("############Connection to DB established successfully############")

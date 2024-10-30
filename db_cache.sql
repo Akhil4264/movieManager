@@ -8,13 +8,13 @@ CREATE TYPE access AS ENUM (
   'RESTRICTED'
 );
 
-CREATE TABLE "User" (
+CREATE TABLE Users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
-    password VARCHAR(50),
+    password VARCHAR(255),
     email VARCHAR(50) UNIQUE NOT NULL,
-    created_on TIMESTAMP NOT NULL,
-    last_login TIMESTAMP NOT NULL
+    created_on BIGINT NOT NULL,
+    last_login BIGINT NOT NULL
 );
 
 CREATE TABLE Playlist (
@@ -25,42 +25,43 @@ CREATE TABLE Playlist (
     created_on TIMESTAMP NOT NULL,
     modified_at TIMESTAMP NOT NULL,
     CONSTRAINT Playlist_owner_id_fkey FOREIGN KEY (owner_id)
-      REFERENCES "User"(id) MATCH SIMPLE
+      REFERENCES Users(id) MATCH SIMPLE
       ON UPDATE NO ACTION ON DELETE NO ACTION
 );
 
-
 CREATE TABLE Movie (
-    id SERIAL PRIMARY KEY,
-    title VARCHAR(100) NOT NULL,
-    year VARCHAR(4) NOT NULL,
-    rated VARCHAR(10),
-    released DATE,
-    runtime VARCHAR(10),
-    genre VARCHAR(100),
-    director VARCHAR(100),
-    writer VARCHAR(100),
-    actors VARCHAR(255),
-    plot TEXT,
-    language VARCHAR(100),
-    country VARCHAR(100),
-    awards VARCHAR(255),
-    poster VARCHAR(255),
-    metascore INTEGER,
-    imdb_rating VARCHAR(10),
-    imdb_votes VARCHAR(20),
-    imdb_id VARCHAR(20) UNIQUE,
-    type VARCHAR(20),
-    dvd VARCHAR(10),
-    box_office VARCHAR(20),
-    production VARCHAR(100),
-    website VARCHAR(255),
-    response BOOLEAN
+    ID SERIAL PRIMARY KEY,
+    Title VARCHAR(100) NOT NULL,
+    Year VARCHAR(4) NOT NULL,
+    Rated VARCHAR(10),
+    Released VARCHAR(255),
+    Runtime VARCHAR(10),
+    Genre VARCHAR(100),
+    Director VARCHAR(100),
+    Writer VARCHAR(100),
+    Actors VARCHAR(255),
+    Plot TEXT,
+    Language VARCHAR(100),
+    Country VARCHAR(100),
+    Awards VARCHAR(255),
+    Poster VARCHAR(255),
+    Metascore VARCHAR(10),
+    ImdbRating VARCHAR(10),
+    ImdbVotes VARCHAR(20),
+    Imdbid VARCHAR(20) UNIQUE NOT NULL,
+    Type VARCHAR(20),
+    Dvd VARCHAR(10),
+    BoxOffice VARCHAR(20),
+    Production VARCHAR(100),
+    Website VARCHAR(255),
+    Response VARCHAR(20)
 );
 
-CREATE TABLE Ratings (
+
+
+CREATE TABLE Rating (
     id SERIAL PRIMARY KEY,
-    movie_id INTEGER NOT NULL,
+    movieId VARCHAR(20) NOT NULL,
     source VARCHAR(100),
     value VARCHAR(10),
     CONSTRAINT fk_movie
@@ -72,14 +73,19 @@ CREATE TABLE Ratings (
 
 
 CREATE TABLE moviePlaylist (
-  movie_id INTEGER NOT NULL,
+  movie_id VARCHAR(20) NOT NULL,
   playlist_id INTEGER NOT NULL,
-  CONSTRAINT moviePlaylist_movie_id_fkey FOREIGN KEY (movie_id)
-    REFERENCES Movie(imdb_id) MATCH SIMPLE
-    ON UPDATE NO ACTION ON DELETE CASCADE
-  CONSTRAINT moviePlaylist_playlist_id_fkey FOREIGN KEY (playlist_id)
-    REFERENCES Playlist(id) MATCH SIMPLE
-    ON UPDATE NO ACTION ON DELETE CASCADE
+  PRIMARY KEY (movie_id, playlist_id),
+  CONSTRAINT fk_movie
+    FOREIGN KEY (movie_id)
+    REFERENCES Movie(imdb_id) 
+    ON UPDATE NO ACTION 
+    ON DELETE CASCADE,
+  CONSTRAINT fk_playlist
+    FOREIGN KEY (playlist_id)
+    REFERENCES Playlist(id) 
+    ON UPDATE NO ACTION 
+    ON DELETE CASCADE
 );
 
 CREATE TABLE userPlaylist (
@@ -87,7 +93,7 @@ CREATE TABLE userPlaylist (
   playlist_id INTEGER NOT NULL,
   writeAccess BOOLEAN DEFAULT false,
   CONSTRAINT userPlaylist_user_id_fkey FOREIGN KEY (user_id)
-    REFERENCES "User"(id) MATCH SIMPLE
+    REFERENCES Users(id) MATCH SIMPLE
     ON UPDATE NO ACTION ON DELETE NO ACTION,
   CONSTRAINT userPlaylist_playlist_id_fkey FOREIGN KEY (playlist_id)
     REFERENCES Playlist(id) MATCH SIMPLE
@@ -95,3 +101,11 @@ CREATE TABLE userPlaylist (
 );
 
 -- DROP DATABASE moviemanager;
+
+
+
+select movie.*,ratings.id as ratingId,ratings.source as source,ratings.value as value from movie 
+join
+ratings
+on 
+ratings.movieId = movie.Imdbid

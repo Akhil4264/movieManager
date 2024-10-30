@@ -4,24 +4,168 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"os"
-
-	// "io/ioutil"
 	"io"
+	"net/http"
+	"log"
+	"os"
+	"sync"
+	"sync/atomic"
 
-	cors "github.com/Akhil4264/movieManager/middlewares"
+	userRepository "github.com/Akhil4264/movieManager/Repositories/userRepository"
+	authmiddleware "github.com/Akhil4264/movieManager/middlewares/authmiddleware"
+	cors "github.com/Akhil4264/movieManager/middlewares/corsmiddleware"
+
 	"github.com/joho/godotenv"
+	"golang.org/x/crypto/bcrypt"
 )
 
 
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Login Page")
+	var loggedUser userRepository.User
+	err := json.NewDecoder(r.Body).Decode(&loggedUser)
+	if err != nil {
+		log.Printf("Error decoding JSON for login: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	
+	log.Printf("Login attempt for email: %s", loggedUser.Email)
+
+	foundUser, err := userRepository.FindUserByEmail(loggedUser.Email)
+	if err != nil {
+		log.Printf("Error finding user by email (%s): %v", loggedUser.Email, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	} else if (*foundUser == userRepository.User{}) {
+		log.Printf("User not found for email: %s", loggedUser.Email)
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(foundUser.Password), []byte(loggedUser.Password))
+	if err != nil {
+		log.Printf("Password mismatch for email: %s - %v", loggedUser.Email, err)
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	token, err := authmiddleware.GenToken(foundUser.Id)
+	if err != nil {
+		log.Printf("Error generating token for user ID %d: %v", foundUser.Id, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	cookie := http.Cookie{
+		Name:     "session_id",
+		Value:    token,
+		Path:     "/",
+		MaxAge:   3600,
+		HttpOnly: true,
+		Secure:   false,
+		SameSite: http.SameSiteNoneMode,
+	}
+	http.SetCookie(w, &cookie)
+	log.Printf("User logged in successfully: %s", loggedUser.Email)
+	json.NewEncoder(w).Encode(map[string]string{
+		"msg": "You have logged in successfully .... ",
+	})
 }
+
 func SignupHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Signup Page")
+	var res userRepository.User
+	err := json.NewDecoder(r.Body).Decode(&res)
+	if err != nil {
+		fmt.Println("Error decoding JSON:", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	var userFound atomic.Bool
+	var goerr atomic.Bool
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+	go func(userFound *atomic.Bool) {
+		defer wg.Done()
+		u, err := userRepository.FindUserByEmail(res.Email)
+		if err != nil {
+			goerr.Store(true)
+			return
+		}
+		if (u == nil) {
+			userFound.Store(true)
+		}
+	}(&userFound)
+
+	wg.Add(1)
+	go func(userFound *atomic.Bool) {
+		defer wg.Done()
+		u, err := userRepository.FindUserByName(res.Username)
+		if err != nil {
+			goerr.Store(true)
+			return
+		}
+		if (u != userRepository.User{} ){
+			userFound.Store(true)
+		}
+	}(&userFound)
+
+	wg.Wait()
+
+	if goerr.Load() {
+		fmt.Println("error accessing db")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if userFound.Load() {
+		fmt.Println("User already exists with the provided email or username.")
+		w.WriteHeader(http.StatusConflict)
+		return
+	}
+
+	hashedPass, err := bcrypt.GenerateFromPassword([]byte(res.Password),10)
+	if err != nil {
+		fmt.Println("Error hashing password:", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	res.Password = string(hashedPass)
+
+	res, err = userRepository.AddUser(res)
+	if err != nil {
+		fmt.Println("Error adding user to the database:", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	token, err := authmiddleware.GenToken(res.Id)
+	if err != nil {
+		fmt.Println("Error generating token:", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	cookie := http.Cookie{
+		Name:     "session_id",
+		Value:    token,
+		Path:     "/",
+		MaxAge:   3600,
+		HttpOnly: true,
+		Secure:   false,
+		SameSite: http.SameSiteDefaultMode,
+	}
+
+	http.SetCookie(w, &cookie)
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{
+		"msg": "You have registered successfully...",
+	})
 }
+
+
 
 func GithubCallback(w http.ResponseWriter,r *http.Request){
 	var err error = godotenv.Load(".env")

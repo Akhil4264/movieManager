@@ -5,12 +5,13 @@ import (
 	"log"
 	"net/http"
 
-	handler "github.com/Akhil4264/movieManager/handlers"
 	connection "github.com/Akhil4264/movieManager/connections"
+	handler "github.com/Akhil4264/movieManager/handlers"
+	"github.com/Akhil4264/movieManager/middlewares/authmiddleware"
 	"github.com/gorilla/mux"
 )
 
-func init(){
+func init() {
 	connection.Connect()
 }
 
@@ -20,12 +21,15 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 
-	mux := mux.NewRouter()
+	mux := mux.NewRouter().StrictSlash(true)
+	
 
 	authRoute := mux.PathPrefix("/auth").Subrouter()
 	usersRoute := mux.PathPrefix("/users").Subrouter()
 	moviesRoute := mux.PathPrefix("/movies").Subrouter()
 	playlistRoute := mux.PathPrefix("/playlists").Subrouter()
+
+	muxMid := authmiddleware.Auth(mux)
 
 	mux.HandleFunc("/", homeHandler)
 	authRoute.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -36,7 +40,6 @@ func main() {
 	authRoute.HandleFunc("/github/callback", handler.GithubCallback).Methods("POST")
 	authRoute.HandleFunc("/github/callback/", handler.GithubCallback).Methods("POST")
 
-	usersRoute.HandleFunc("", handler.GetAllUsers).Methods("GET")
 	usersRoute.HandleFunc("/", handler.GetAllUsers).Methods("GET")
 	usersRoute.HandleFunc("/", handler.CreateUser).Methods("POST")
 	usersRoute.HandleFunc("/{userId}", handler.GetUserById).Methods("GET")
@@ -45,8 +48,8 @@ func main() {
 	usersRoute.HandleFunc("/query/{Query}", handler.GetUsersByQuery).Methods("GET")
 
 	moviesRoute.HandleFunc("/search", handler.GetMovieByQuery).Methods("POST")
+	moviesRoute.HandleFunc("/insert/movie", handler.GetMovieById).Methods("POST")
 
-	playlistRoute.HandleFunc("", handler.CreatePlaylist).Methods("POST")
 	playlistRoute.HandleFunc("/", handler.CreatePlaylist).Methods("POST")
 	playlistRoute.HandleFunc("/{playlistId}", handler.GetPlayListById).Methods("GET")
 	playlistRoute.HandleFunc("/{playlistId}", handler.UpdatePlayListById).Methods("PUT")
@@ -55,6 +58,6 @@ func main() {
 	playlistRoute.HandleFunc("/{playlistId}/movie/{movieId}", handler.AddMovieToPlaylist).Methods("POST")
 	playlistRoute.HandleFunc("/{playlistId}/movie/{movieId}", handler.RemoveMovieFromPlaylist).Methods("DELETE")
 
-	log.Fatal(http.ListenAndServe(":80", mux))
+	log.Fatal(http.ListenAndServe(":80", muxMid))
 
 }
