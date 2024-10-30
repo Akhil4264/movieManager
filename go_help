@@ -63,3 +63,27 @@ To send a Response :
 
 
 
+
+SQL : 
+    select row_to_json(movie_data) as movieratings
+    (SELECT 
+    movie.imdbid, 
+    COALESCE(
+        json_agg(
+            json_build_object(
+                'id', ratings.id,
+                'source', ratings.source,
+                'value', ratings.value
+            )
+        ) FILTER (WHERE ratings.id IS NOT NULL),
+        '[]'
+    ) AS ratings
+    FROM movie
+    LEFT JOIN ratings ON ratings.movieId = movie.imdbid
+    GROUP BY movie.imdbid) as movie_data
+
+writing a custom aggregator in SQL.
+
+
+
+

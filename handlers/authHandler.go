@@ -37,7 +37,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error finding user by email (%s): %v", loggedUser.Email, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
-	} else if (*foundUser == userRepository.User{}) {
+	} else if (foundUser == nil) {
 		log.Printf("User not found for email: %s", loggedUser.Email)
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -74,8 +74,8 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func SignupHandler(w http.ResponseWriter, r *http.Request) {
-	var res userRepository.User
-	err := json.NewDecoder(r.Body).Decode(&res)
+	var req userRepository.User
+	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		fmt.Println("Error decoding JSON:", err)
 		w.WriteHeader(http.StatusBadRequest)
@@ -89,12 +89,12 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 	wg.Add(1)
 	go func(userFound *atomic.Bool) {
 		defer wg.Done()
-		u, err := userRepository.FindUserByEmail(res.Email)
-		if err != nil {
+		u, err := userRepository.FindUserByEmail(req.Email)
+		if (err != nil) {
 			goerr.Store(true)
 			return
 		}
-		if (u == nil) {
+		if (u != nil) {
 			userFound.Store(true)
 		}
 	}(&userFound)
@@ -102,12 +102,12 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 	wg.Add(1)
 	go func(userFound *atomic.Bool) {
 		defer wg.Done()
-		u, err := userRepository.FindUserByName(res.Username)
+		u, err := userRepository.FindUserByName(req.Username)
 		if err != nil {
 			goerr.Store(true)
 			return
 		}
-		if (u != userRepository.User{} ){
+		if (u != nil ){
 			userFound.Store(true)
 		}
 	}(&userFound)
@@ -126,15 +126,15 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hashedPass, err := bcrypt.GenerateFromPassword([]byte(res.Password),10)
+	hashedPass, err := bcrypt.GenerateFromPassword([]byte(req.Password),10)
 	if err != nil {
 		fmt.Println("Error hashing password:", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	res.Password = string(hashedPass)
+	req.Password = string(hashedPass)
 
-	res, err = userRepository.AddUser(res)
+	res, err := userRepository.AddUser(req)
 	if err != nil {
 		fmt.Println("Error adding user to the database:", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -164,7 +164,6 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 		"msg": "You have registered successfully...",
 	})
 }
-
 
 
 func GithubCallback(w http.ResponseWriter,r *http.Request){

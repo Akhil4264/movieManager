@@ -36,7 +36,15 @@ func GetMovieById(w http.ResponseWriter,r *http.Request){
 	if(err != nil){
 		fmt.Println("error getting movie by id : ",err)
 	}
-	json.NewEncoder(w).Encode(*movie)
+	if(movie == nil){
+		err = json.NewEncoder(w).Encode(map[string]string{})
+	}else{
+		err = json.NewEncoder(w).Encode(*movie)
+	}
+	if(err != nil){
+		fmt.Println("error sending response : ",err)
+	}
+	
 }
 func AddMovie(w http.ResponseWriter , r *http.Request){
 	fmt.Fprintf(w,"Adding movie to table")

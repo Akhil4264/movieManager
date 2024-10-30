@@ -23,7 +23,7 @@ type User struct {
 
 var SignedUsers []User = make([]User, 0)
 
-func AddUser(user User) (User, error) {
+func AddUser(user User) (*User, error) {
 	user.CreatedOn = time.Now().Unix()
 	user.LastLogin = user.CreatedOn
 	row := db.DB.QueryRow("INSERT INTO Users (username, password, email, created_on, last_login) VALUES ($1, $2, $3, $4, $5) RETURNING id,username,email,created_on,last_login", user.Username, user.Password, user.Email, user.CreatedOn, user.LastLogin)
@@ -31,26 +31,26 @@ func AddUser(user User) (User, error) {
 	if err != nil {
 		switch err {
 		case sql.ErrNoRows:
-			return user, errors.New("couldn't Insert user into DB")
+			return nil, nil
 		default:
-			return user, err
+			return nil, err
 		}
 	}
-	return user, err
+	return &user, err
 }
 
-func FindUserById(id int) (User, error) {
+func FindUserById(id int) (*User, error) {
 	var user User
 	row := db.DB.QueryRow("SELECT id,username,email,created_on,last_login FROM User WHERE id =$1", id)
 	err := row.Scan(&user.Id, &user.Username, &user.Email, &user.CreatedOn, &user.LastLogin)
 	if err == nil {
-		return user, nil
+		return &user, nil
 	}
 	switch err {
 	case sql.ErrNoRows:
-		return user, nil
+		return nil, nil
 	default:
-		return user, err
+		return nil, err
 	}
 }
 
@@ -65,22 +65,22 @@ func FindUserByEmail(mailId string) (*User, error) {
 	case sql.ErrNoRows:
 		return nil, nil
 	default:
-		return &user, err
+		return nil, err
 	}
 }
 
-func FindUserByName(username string) (User, error) {
+func FindUserByName(username string) (*User, error) {
 	var user User
 	row := db.DB.QueryRow("SELECT id,username,email,created_on,last_login FROM Users WHERE username =$1", username)
 	err := row.Scan(&user.Id, &user.Username, &user.Email, &user.CreatedOn, &user.LastLogin)
 	if err == nil {
-		return user, nil
+		return &user, nil
 	}
 	switch err {
 	case sql.ErrNoRows:
-		return user, nil
+		return nil, nil
 	default:
-		return user, err
+		return nil, err
 	}
 }
 

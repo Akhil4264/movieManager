@@ -16,7 +16,6 @@ import (
 )
 
 type Movie struct {
-	ID         int       `json:"id,omitempty"`
 	Title      string    `json:"title,omitempty"`
 	Year       string    `json:"year,omitempty"`
 	Rated      string    `json:"rated,omitempty"`
@@ -43,6 +42,18 @@ type Movie struct {
 	Response   string     `json:"response,omitempty"`
 }
 
+type Rating struct {
+	ID      int    `json:"id"`
+	MovieID string    `json:"movieId"`
+	Source  string `json:"source"`
+	Value  string `json:"value"`
+}
+
+type MovieRatings struct{
+	Movie
+	Ratings []Rating
+}
+
 type MovieRes struct {
 	Search       []Movie `json:"search"`
 	TotalResults string  `json:"totalResults"`
@@ -55,9 +66,8 @@ type MovieRes struct {
 
 // give option to only search movies by search string ..that too.. min 3 characters needed, if characters are entered only then we can show them filters
 
-func AddMovie(movie Movie) error {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	v := reflect.ValueOf(&movie).Elem()
+func AddMovie(movieRatings MovieRatings) (*MovieRatings, error) {
+	v := reflect.ValueOf(&(movieRatings.Movie)).Elem()
 	t := v.Type()
 	var columns []string
 	var placeholders []string
@@ -70,84 +80,96 @@ func AddMovie(movie Movie) error {
 		values = append(values, v.Field(i).Interface())
 	}
 
-	query := fmt.Sprintf("INSERT INTO movie (%s) VALUES (%s)",strings.Join(columns, ", "),strings.Join(placeholders, ", "))
-	fmt.Println("insert movie query string : ",query)
-	_, err := db.DB.Exec(query, values...)
+	// Start a transaction
+	tx, err := db.DB.Begin()
+	if err != nil {
+		fmt.Println("Error creating a transaction: ", err)
+		return nil, err
+	}
+
+	query := fmt.Sprintf("INSERT INTO movie (%s) VALUES (%s)", strings.Join(columns, ", "), strings.Join(placeholders, ", "))
+	fmt.Println("db query : ", query)
+
+	_,err = tx.Exec(query, values...)
 	if err != nil {
 		log.Printf("Error inserting movie: %v", err)
-		return err
+		_ = tx.Rollback()
+		return nil, err
 	}
 
-	log.Printf("Successfully added movie: %v", movie)
-	return nil
+	// Insert ratings
+	ratingQuery := `INSERT INTO ratings (movieId, source, value) VALUES ($1, $2, $3) RETURNING ID`
+	for ind, rating := range movieRatings.Ratings {
+		var ratingId int
+		err = tx.QueryRow(ratingQuery, movieRatings.ImdbID, rating.Source, rating.Value).Scan(&ratingId)
+		if err != nil {
+			log.Printf("Error inserting rating: %v", err)
+			_ = tx.Rollback()
+			return nil, err
+		}
+		movieRatings.Ratings[ind].ID = ratingId
+		movieRatings.Ratings[ind].MovieID = movieRatings.ImdbID
+	}
+
+	// Commit the transaction
+	if err = tx.Commit(); err != nil {
+		log.Printf("Error committing transaction: %v", err)
+		return nil, err
+	}
+
+	return &movieRatings, nil
 }
 
-func CheckAndAddMovie(movie Movie, status bool) error {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	if status {
-		log.Printf("Status is true; adding movie: %v", movie)
+func CheckAndAddMovie(movie MovieRatings, conf bool) (*MovieRatings, error) {
+	if conf {
 		return AddMovie(movie)
 	}
-
-	row := db.DB.QueryRow("SELECT * from movies where ImdbID = $1", movie.ImdbID)
-	v := reflect.ValueOf(&movie).Elem()
-	values := make([]interface{}, v.NumField())
-	for i := 0; i < v.NumField(); i++ {
-		values[i] = v.Field(i).Addr().Interface()
-	}
-
-	err := row.Scan(values...)
+	query:= "SELECT row_to_json(movieratings) FROM (SELECT m.*, COALESCE((SELECT json_agg(r) FROM ratings r WHERE r.movieId = $1), '[]') AS ratings FROM movie m WHERE m.imdbID = $1) AS movieratings"
+	row := db.DB.QueryRow(query, movie.ImdbID)
+	var data string
+	err := row.Scan(&data)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			log.Printf("Movie not found in database. Adding movie: %v", movie)
+			log.Printf("Movie with ID %v not found in database. Fetching remotely...", movie.ImdbID)
 			return AddMovie(movie)
 		}
-		log.Printf("Error checking for existing movie: %v", err)
-		return err
+		log.Printf("Error retrieving movie by ID: %v", err)
+		return nil, err
 	}
-
-	log.Printf("Movie already exists: %v", movie)
-	return nil
+	var movieRatings MovieRatings
+	err = json.Unmarshal([]byte(data),&movieRatings)
+	if(err != nil){
+		fmt.Println("error deserailizing json data : ",err)
+		return nil,err
+	}
+	log.Printf("Successfully retrieved movie: %v", movieRatings)
+	return &movieRatings,nil
 }
 
-func GetMovieByIdRemote(id string, status bool) (*Movie, error) {
+func GetMovieByIdRemote(id string, status bool) (*MovieRatings, error) {
 	godotenv.Load(".env")
 	api_key := os.Getenv("OMDB_API_KEY")
-	searchString := fmt.Sprintf("http://www.omdbapi.com/?apikey=%v&i=%v", api_key, id)
+	searchString := fmt.Sprintf("http://www.omdbapi.com/?apikey=%v&i=%v&plot=full", api_key, id)
 	res, err := http.Get(searchString)
 	if err != nil {
 		log.Printf("Error fetching movie from remote: %v", err)
 		return nil, err
 	}
-	defer res.Body.Close()
-
-	var movie Movie
-	err = json.NewDecoder(res.Body).Decode(&movie)
+	var movieRatings MovieRatings
+	err = json.NewDecoder(res.Body).Decode(&movieRatings)
 	if err != nil {
 		log.Printf("Error decoding response for movie ID %v: %v", id, err)
 		return nil, err
 	}
-
-	err = AddMovie(movie)
-	if err != nil {
-		log.Printf("Error adding movie after fetching: %v", err)
-		return &movie, err
-	}
-
-	log.Printf("Successfully fetched and added movie: %v", movie)
-	return &movie, nil
+	res.Body.Close()
+	return CheckAndAddMovie(movieRatings,status)
 }
 
-func GetMovieById(id string) (*Movie, error) {
-	row := db.DB.QueryRow("SELECT * from movie where ImdbID = $1", id)
-	var movie Movie
-	v := reflect.ValueOf(&movie).Elem()
-	values := make([]interface{}, v.NumField())
-	for i := 0; i < v.NumField(); i++ {
-		values[i] = v.Field(i).Addr().Interface()
-	}
-
-	err := row.Scan(values...)
+func GetMovieById(id string) (*MovieRatings, error) {
+	query:= "SELECT row_to_json(movieratings) FROM (SELECT m.*, COALESCE((SELECT json_agg(r) FROM ratings r WHERE r.movieId = $1), '[]') AS ratings FROM movie m WHERE m.imdbID = $1) AS movieratings"
+	row := db.DB.QueryRow(query, id)
+	var data string
+	err := row.Scan(&data)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			log.Printf("Movie with ID %v not found in database. Fetching remotely...", id)
@@ -156,9 +178,14 @@ func GetMovieById(id string) (*Movie, error) {
 		log.Printf("Error retrieving movie by ID: %v", err)
 		return nil, err
 	}
-
-	log.Printf("Successfully retrieved movie: %v", movie)
-	return &movie, nil
+	var movieRatings MovieRatings
+	err = json.Unmarshal([]byte(data),&movieRatings)
+	if(err != nil){
+		fmt.Println("error deserailizing json data : ",err)
+		return nil,err
+	}
+	log.Printf("Successfully retrieved movie: %v", movieRatings)
+	return &movieRatings,nil
 }
 
 

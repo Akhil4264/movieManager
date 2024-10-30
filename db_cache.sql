@@ -30,7 +30,6 @@ CREATE TABLE Playlist (
 );
 
 CREATE TABLE Movie (
-    ID SERIAL PRIMARY KEY,
     Title VARCHAR(100) NOT NULL,
     Year VARCHAR(4) NOT NULL,
     Rated VARCHAR(10),
@@ -48,7 +47,7 @@ CREATE TABLE Movie (
     Metascore VARCHAR(10),
     ImdbRating VARCHAR(10),
     ImdbVotes VARCHAR(20),
-    Imdbid VARCHAR(20) UNIQUE NOT NULL,
+    Imdbid VARCHAR(20) PRIMARY KEY UNIQUE NOT NULL,
     Type VARCHAR(20),
     Dvd VARCHAR(10),
     BoxOffice VARCHAR(20),
@@ -109,3 +108,18 @@ join
 ratings
 on 
 ratings.movieId = movie.Imdbid
+
+
+-- tt0499549
+
+SELECT row_to_json(movieratings)
+FROM 
+(SELECT m.*
+, COALESCE((SELECT json_agg(r) FROM ratings r WHERE r.movieId = 'tt0499549')
+, '[]') AS ratings movie m WHERE m.imdbID = 'tt0499549') 
+AS 
+movieratings;
+
+
+
+
