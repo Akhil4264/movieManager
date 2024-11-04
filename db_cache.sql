@@ -21,10 +21,10 @@ CREATE TABLE Playlist (
     id SERIAL PRIMARY KEY,
     name VARCHAR(50) UNIQUE NOT NULL,
     shareAccess access NOT NULL,
-    owner_id INTEGER NOT NULL,
-    created_on TIMESTAMP NOT NULL,
-    modified_at TIMESTAMP NOT NULL,
-    CONSTRAINT Playlist_owner_id_fkey FOREIGN KEY (owner_id)
+    ownerId INTEGER NOT NULL,
+    createdOn BIGINT NOT NULL,
+    modifiedAt BIGINT NOT NULL,
+    CONSTRAINT Playlist_owner_id_fkey FOREIGN KEY (ownerId)
       REFERENCES Users(id) MATCH SIMPLE
       ON UPDATE NO ACTION ON DELETE NO ACTION
 );
@@ -91,6 +91,9 @@ CREATE TABLE userPlaylist (
   user_id INTEGER NOT NULL,
   playlist_id INTEGER NOT NULL,
   writeAccess BOOLEAN DEFAULT false,
+  -- add primary key 
+  PRIMARY KEY (user_id,playlist_id)
+  --
   CONSTRAINT userPlaylist_user_id_fkey FOREIGN KEY (user_id)
     REFERENCES Users(id) MATCH SIMPLE
     ON UPDATE NO ACTION ON DELETE NO ACTION,

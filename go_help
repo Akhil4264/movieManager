@@ -87,3 +87,8 @@ writing a custom aggregator in SQL.
 
 
 
+# select p.shareAccess,t.writeAccess from (select * from playlist where playlistId=$2)as p left join (select * from userplaylist where userId=$1 and playlist=$2)as t on p.id = t.playlist_id ",userId,playlistId
+
+
+
+
