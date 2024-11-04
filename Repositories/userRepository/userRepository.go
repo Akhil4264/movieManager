@@ -4,28 +4,36 @@ import (
 	// "fmt"
 	"database/sql"
 	"errors"
+	"fmt"
+	"net/http"
+	"strings"
+
+	// "fmt"
 	"reflect"
 
 	// "fmt"
 	"time"
 
 	db "github.com/Akhil4264/movieManager/connections"
+	"github.com/Akhil4264/movieManager/middlewares/authmiddleware"
 )
 
 type User struct {
-	Id        int    `json:"id"`
-	Username  string `json:"username"`
-	Password  string `json:"password"`
-	Email     string `json:"email"`
-	CreatedOn int64  `json:"created_on"`
-	LastLogin int64  `json:"last_login"`
+	Id        int    `json:"id,omitempty"`
+	Username  string `json:"username,omitempty"`
+	Password  string `json:"password,omitempty"`
+	Email     string `json:"email,omitempty"`
+	CreatedOn int64  `json:"created_on,omitempty"`
+	LastLogin int64  `json:"last_login,omitempty"`
 }
 
 var SignedUsers []User = make([]User, 0)
 
 func AddUser(user User) (*User, error) {
 	user.CreatedOn = time.Now().Unix()
+	user.Username = strings.ToLower(user.Username)
 	user.LastLogin = user.CreatedOn
+	fmt.Println(user.CreatedOn)
 	row := db.DB.QueryRow("INSERT INTO Users (username, password, email, created_on, last_login) VALUES ($1, $2, $3, $4, $5) RETURNING id,username,email,created_on,last_login", user.Username, user.Password, user.Email, user.CreatedOn, user.LastLogin)
 	err := row.Scan(&user.Id, &user.Username, &user.Email, &user.CreatedOn, &user.LastLogin)
 	if err != nil {
@@ -41,17 +49,32 @@ func AddUser(user User) (*User, error) {
 
 func FindUserById(id int) (*User, error) {
 	var user User
-	row := db.DB.QueryRow("SELECT id,username,email,created_on,last_login FROM User WHERE id =$1", id)
+	row := db.DB.QueryRow("SELECT id,username,email,created_on,last_login FROM users WHERE id =$1", id)
 	err := row.Scan(&user.Id, &user.Username, &user.Email, &user.CreatedOn, &user.LastLogin)
-	if err == nil {
-		return &user, nil
+	if(err != nil){
+		switch err {
+			case sql.ErrNoRows:
+				return nil, nil
+			default:
+				return nil, err
+		}
 	}
-	switch err {
-	case sql.ErrNoRows:
-		return nil, nil
-	default:
-		return nil, err
+	return &user,nil
+}
+
+func GetUserFromRequest(r *http.Request)(*User,error){
+	claims,err := authmiddleware.HandleClaims(r)
+	if(err != nil || claims == nil){
+		return nil,err
 	}
+	user,err := FindUserById(int((*claims)["userId"].(float64)))
+	if(err != nil){
+		return nil,err
+	}
+	if(user == nil){
+		return nil,nil
+	}
+	return user,nil
 }
 
 func FindUserByEmail(mailId string) (*User, error) {
@@ -84,9 +107,17 @@ func FindUserByName(username string) (*User, error) {
 	}
 }
 
-func GetAllUsers() ([]User, error) {
+func GetAllUsers(user *User) ([]User, error) {
+	var query string
+	var id int
+	if(user != nil){
+		query = "SELECT id,username,email FROM Users WHERE id != $1"
+		id = user.Id
+	}else{
+		query = "SELECT id,username,email FROM Users"
+	}
 	usersList := make([]User, 0)
-	row, err := db.DB.Query("SELECT id,username,email FROM Users")
+	row, err := db.DB.Query(query,id)
 	if err != nil {
 		return usersList, err
 	}
@@ -101,9 +132,10 @@ func GetAllUsers() ([]User, error) {
 	return usersList, nil
 }
 
-func GetUsersByQuery(query string) (*[]User, error) {
+func GetUsersByQuery(id int,query string) (*[]User, error) {
 	var usersList []User
-	rows,err := db.DB.Query("SELECT id,username,email from users where username like %$1%",query)
+	q := fmt.Sprintf("SELECT id, username, email FROM users WHERE username LIKE '%%%s%%' AND id != $1", query)
+	rows,err := db.DB.Query(q,id)
 	if(err != nil){
 		return nil,err
 	}
@@ -132,7 +164,8 @@ func UpdateUserFieldById(id int,field string,val interface{}) error{
 		default : 
 			return errors.New("invlaid Field")
 	}
-	_,err := db.DB.Exec("UPDATE users SET $1=$2 where id=$3",field,val,id)
+	query := fmt.Sprintf("UPDATE users SET %s=$1 where id=$2",field)
+	_,err := db.DB.Exec(query,val,id)
 	if(err != nil){
 		return err
 	}
