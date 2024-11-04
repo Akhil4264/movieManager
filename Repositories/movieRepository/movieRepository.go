@@ -88,7 +88,6 @@ func AddMovie(movieRatings MovieRatings) (*MovieRatings, error) {
 	}
 
 	query := fmt.Sprintf("INSERT INTO movie (%s) VALUES (%s)", strings.Join(columns, ", "), strings.Join(placeholders, ", "))
-	fmt.Println("db query : ", query)
 
 	_,err = tx.Exec(query, values...)
 	if err != nil {
@@ -184,7 +183,7 @@ func GetMovieById(id string) (*MovieRatings, error) {
 		fmt.Println("error deserailizing json data : ",err)
 		return nil,err
 	}
-	log.Printf("Successfully retrieved movie: %v", movieRatings)
+	log.Printf("Successfully retrieved movie with id : %s",id)
 	return &movieRatings,nil
 }
 
