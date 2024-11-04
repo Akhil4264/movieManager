@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"log"
+	"net/http"
 	"os"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	userRepository "github.com/Akhil4264/movieManager/Repositories/userRepository"
 	authmiddleware "github.com/Akhil4264/movieManager/middlewares/authmiddleware"
@@ -22,6 +23,7 @@ import (
 
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
+
 	var loggedUser userRepository.User
 	err := json.NewDecoder(r.Body).Decode(&loggedUser)
 	if err != nil {
@@ -65,6 +67,12 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 		Secure:   false,
 		SameSite: http.SameSiteNoneMode,
+	}
+	err = userRepository.UpdateUserFieldById(foundUser.Id,"last_login",time.Now().Unix())
+	if(err != nil){
+		fmt.Println("Error in  updating field : ",err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	http.SetCookie(w, &cookie)
 	log.Printf("User logged in successfully: %s", loggedUser.Email)
@@ -165,6 +173,18 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func CheckHandler(w http.ResponseWriter,r *http.Request){
+	user,err := userRepository.GetUserFromRequest(r)
+	if(err != nil){
+		w.WriteHeader(500)
+		return
+	}
+	if(user != nil){
+		json.NewEncoder(w).Encode(user)
+		return
+	}
+	w.WriteHeader(http.StatusBadRequest)
+}
 
 func GithubCallback(w http.ResponseWriter,r *http.Request){
 	var err error = godotenv.Load(".env")

@@ -2,12 +2,16 @@ package authmiddleware
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
 )
+
+type claimskey int
+var claimsKey claimskey
 
 
 func GenToken(userId int) (string,error){
@@ -19,36 +23,55 @@ func GenToken(userId int) (string,error){
 	return tokenPtr.SignedString(secretKey)
 }
 
-func VerifyToken(access_token string)(jwt.MapClaims,error){
+func VerifyToken(accessToken string) (jwt.MapClaims, error) {
 	claims := jwt.MapClaims{}
-	token,err := jwt.ParseWithClaims(access_token,&claims,func(t *jwt.Token) (interface{}, error) {
-		return []byte("secretpassword"),nil
+	token, err := jwt.ParseWithClaims(accessToken, &claims, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, jwt.ErrSignatureInvalid
+		}
+		return []byte("secretpassword"), nil
 	})
 
-	if(err != nil){
-		return nil,err
+	if err != nil {
+		return nil, err
 	}
 
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		return claims, nil
+	if !token.Valid {
+		return nil, jwt.ErrInvalidKey
 	}
 
-	return nil,err
+	return claims, nil
+}
+
+func HandleClaims(r *http.Request) (*jwt.MapClaims, error) {
+	claims, ok := r.Context().Value(claimsKey).(jwt.MapClaims)
+	if(!ok){
+		return nil,errors.New("no Token Found")
+	}
+	return &claims,nil
+}
+
+func HandleClaimsAuthRoute(r *http.Request) (jwt.MapClaims, bool) {
+	claims, ok := r.Context().Value(claimsKey).(jwt.MapClaims)
+	return claims, ok
 }
 
 func Auth(next http.Handler) (http.Handler){
-	// get token from session 
-	// if token is not present send and error stating no token found.
-	// var access_token string
-	// claims,err := VerifyToken(access_token)
-	// if(err != nil){
-	// 	return nil,errors.New("invalid Token")
-	// }
 	return(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie,err := r.Cookie("session_id")
 		if(err != nil){
-			fmt.Println(err)
+			switch err {
+				case http.ErrNoCookie:
+					fmt.Println("No cookie found")
+					next.ServeHTTP(w,r)
+					return
+				default:
+					fmt.Println(err)
+					fmt.Println("error fectching cookie")
+					return 
+			}
 		}
+
 		if(cookie == nil){
 			next.ServeHTTP(w,r)
 			return
@@ -56,13 +79,15 @@ func Auth(next http.Handler) (http.Handler){
 		claims,err := VerifyToken(cookie.Value)
 		if(err != nil){
 			fmt.Println(err)
+			return 
 		}
-		type claimskey int
-		var claimsKey claimskey
 		ctx := context.WithValue(r.Context(),claimsKey,claims)
 		r = r.WithContext(ctx)
-		fmt.Println(ctx.Value(claimsKey).(jwt.MapClaims))
 		next.ServeHTTP(w,r)
 	}))
-	
 }
+
+
+
+
+
