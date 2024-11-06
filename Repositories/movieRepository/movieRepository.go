@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	db "github.com/Akhil4264/movieManager/connections"
+	"github.com/joho/godotenv"
 	"log"
 	"math"
 	"net/http"
@@ -11,45 +13,43 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	db "github.com/Akhil4264/movieManager/connections"
-	"github.com/joho/godotenv"
 )
 
 type Movie struct {
-	Title      string    `json:"title,omitempty"`
-	Year       string    `json:"year,omitempty"`
-	Rated      string    `json:"rated,omitempty"`
+	Title      string `json:"title,omitempty"`
+	Year       string `json:"year,omitempty"`
+	Rated      string `json:"rated,omitempty"`
 	Released   string `json:"released,omitempty"`
-	Runtime    string    `json:"runtime,omitempty"`
-	Genre      string    `json:"genre,omitempty"`
-	Director   string    `json:"director,omitempty"`
-	Writer     string    `json:"writer,omitempty"`
-	Actors     string    `json:"actors,omitempty"`
-	Plot       string    `json:"plot,omitempty"`
-	Language   string    `json:"language,omitempty"`
-	Country    string    `json:"country,omitempty"`
-	Awards     string    `json:"awards,omitempty"`
-	Poster     string    `json:"poster,omitempty"`
-	Metascore  string    `json:"metascore,omitempty"`
-	ImdbRating string    `json:"imdbRating,omitempty"`
-	ImdbVotes  string    `json:"imdbVotes,omitempty"`
-	ImdbID     string    `json:"imdbID"`
-	Type       string    `json:"type,omitempty"`
-	DVD        string    `json:"dvd,omitempty"`
-	BoxOffice  string    `json:"boxOffice,omitempty"`
-	Production string    `json:"production,omitempty"`
-	Website    string    `json:"website,omitempty"`
-	Response   string     `json:"response,omitempty"`
+	Runtime    string `json:"runtime,omitempty"`
+	Genre      string `json:"genre,omitempty"`
+	Director   string `json:"director,omitempty"`
+	Writer     string `json:"writer,omitempty"`
+	Actors     string `json:"actors,omitempty"`
+	Plot       string `json:"plot,omitempty"`
+	Language   string `json:"language,omitempty"`
+	Country    string `json:"country,omitempty"`
+	Awards     string `json:"awards,omitempty"`
+	Poster     string `json:"poster,omitempty"`
+	Metascore  string `json:"metascore,omitempty"`
+	ImdbRating string `json:"imdbRating,omitempty"`
+	ImdbVotes  string `json:"imdbVotes,omitempty"`
+	ImdbID     string `json:"imdbID"`
+	Type       string `json:"type,omitempty"`
+	DVD        string `json:"dvd,omitempty"`
+	BoxOffice  string `json:"boxOffice,omitempty"`
+	Production string `json:"production,omitempty"`
+	Website    string `json:"website,omitempty"`
+	Response   string `json:"response,omitempty"`
 }
 
 type Rating struct {
 	ID      int    `json:"id"`
-	MovieID string    `json:"movieId"`
+	MovieID string `json:"movieId"`
 	Source  string `json:"source"`
-	Value  string `json:"value"`
+	Value   string `json:"value"`
 }
 
-type MovieRatings struct{
+type MovieRatings struct {
 	Movie
 	Ratings []Rating
 }
@@ -89,7 +89,7 @@ func AddMovie(movieRatings MovieRatings) (*MovieRatings, error) {
 
 	query := fmt.Sprintf("INSERT INTO movie (%s) VALUES (%s)", strings.Join(columns, ", "), strings.Join(placeholders, ", "))
 
-	_,err = tx.Exec(query, values...)
+	_, err = tx.Exec(query, values...)
 	if err != nil {
 		log.Printf("Error inserting movie: %v", err)
 		_ = tx.Rollback()
@@ -123,7 +123,7 @@ func CheckAndAddMovie(movie MovieRatings, conf bool) (*MovieRatings, error) {
 	if conf {
 		return AddMovie(movie)
 	}
-	query:= "SELECT row_to_json(movieratings) FROM (SELECT m.*, COALESCE((SELECT json_agg(r) FROM ratings r WHERE r.movieId = $1), '[]') AS ratings FROM movie m WHERE m.imdbID = $1) AS movieratings"
+	query := "SELECT row_to_json(movieratings) FROM (SELECT m.*, COALESCE((SELECT json_agg(r) FROM ratings r WHERE r.movieId = $1), '[]') AS ratings FROM movie m WHERE m.imdbID = $1) AS movieratings"
 	row := db.DB.QueryRow(query, movie.ImdbID)
 	var data string
 	err := row.Scan(&data)
@@ -136,13 +136,13 @@ func CheckAndAddMovie(movie MovieRatings, conf bool) (*MovieRatings, error) {
 		return nil, err
 	}
 	var movieRatings MovieRatings
-	err = json.Unmarshal([]byte(data),&movieRatings)
-	if(err != nil){
-		fmt.Println("error deserailizing json data : ",err)
-		return nil,err
+	err = json.Unmarshal([]byte(data), &movieRatings)
+	if err != nil {
+		fmt.Println("error deserailizing json data : ", err)
+		return nil, err
 	}
 	log.Printf("Successfully retrieved movie: %v", movieRatings)
-	return &movieRatings,nil
+	return &movieRatings, nil
 }
 
 func GetMovieByIdRemote(id string, status bool) (*MovieRatings, error) {
@@ -161,11 +161,11 @@ func GetMovieByIdRemote(id string, status bool) (*MovieRatings, error) {
 		return nil, err
 	}
 	res.Body.Close()
-	return CheckAndAddMovie(movieRatings,status)
+	return CheckAndAddMovie(movieRatings, status)
 }
 
 func GetMovieById(id string) (*MovieRatings, error) {
-	query:= "SELECT row_to_json(movieratings) FROM (SELECT m.*, COALESCE((SELECT json_agg(r) FROM ratings r WHERE r.movieId = $1), '[]') AS ratings FROM movie m WHERE m.imdbID = $1) AS movieratings"
+	query := "SELECT row_to_json(movieratings) FROM (SELECT m.*, COALESCE((SELECT json_agg(r) FROM ratings r WHERE r.movieId = $1), '[]') AS ratings FROM movie m WHERE m.imdbID = $1) AS movieratings"
 	row := db.DB.QueryRow(query, id)
 	var data string
 	err := row.Scan(&data)
@@ -178,15 +178,14 @@ func GetMovieById(id string) (*MovieRatings, error) {
 		return nil, err
 	}
 	var movieRatings MovieRatings
-	err = json.Unmarshal([]byte(data),&movieRatings)
-	if(err != nil){
-		fmt.Println("error deserailizing json data : ",err)
-		return nil,err
+	err = json.Unmarshal([]byte(data), &movieRatings)
+	if err != nil {
+		fmt.Println("error deserailizing json data : ", err)
+		return nil, err
 	}
-	log.Printf("Successfully retrieved movie with id : %s",id)
-	return &movieRatings,nil
+	log.Printf("Successfully retrieved movie with id : %s", id)
+	return &movieRatings, nil
 }
-
 
 func GetMoviesByQuery(searchQuery string, yearQuery int, page int) (*MovieRes, error) {
 	godotenv.Load(".env")

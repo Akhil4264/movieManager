@@ -28,7 +28,7 @@ func GetMovieByQuery(w http.ResponseWriter , r *http.Request){
 	err = json.NewDecoder(r.Body).Decode(&searchq)
 	if(err != nil){
 		fmt.Println("error acccessing data from req : ",err)
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	if (len(searchq.SearchQuery) < 3) {

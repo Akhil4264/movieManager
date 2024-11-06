@@ -63,9 +63,9 @@ func FindUserById(id int) (*User, error) {
 }
 
 func GetUserFromRequest(r *http.Request)(*User,error){
-	claims,err := authmiddleware.HandleClaims(r)
-	if(err != nil || claims == nil){
-		return nil,err
+	claims := authmiddleware.HandleClaims(r)
+	if(claims == nil){
+		return nil,nil
 	}
 	user,err := FindUserById(int((*claims)["userId"].(float64)))
 	if(err != nil){

@@ -23,7 +23,7 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 func main() {
 
 	mux := mux.NewRouter().StrictSlash(true)
-	
+
 	authRoute := mux.PathPrefix("/auth").Subrouter()
 	usersRoute := mux.PathPrefix("/users").Subrouter()
 	moviesRoute := mux.PathPrefix("/movies").Subrouter()
@@ -32,11 +32,11 @@ func main() {
 	muxMid := authmiddleware.Auth(mux)
 
 	mux.HandleFunc("/", homeHandler)
-	mux.HandleFunc("/checkToken",handler.CheckHandler).Methods("GET")
+	mux.HandleFunc("/checkToken", handler.CheckHandler).Methods("GET")
 	authRoute.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "base auth route")
 	}).Methods("GET")
-	
+
 	authRoute.HandleFunc("/login", handler.LoginHandler).Methods("POST")
 	authRoute.HandleFunc("/signup", handler.SignupHandler).Methods("POST")
 	authRoute.HandleFunc("/github/callback", handler.GithubCallback).Methods("POST")
@@ -52,11 +52,14 @@ func main() {
 	moviesRoute.HandleFunc("/search", handler.GetMovieByQuery).Methods("POST")
 	moviesRoute.HandleFunc("/{movieId}", handler.GetMovieById).Methods("GET")
 
+	playlistRoute.HandleFunc("/", handler.GetPlayLists).Methods("GET")
 	playlistRoute.HandleFunc("/", handler.CreatePlaylist).Methods("POST")
 	playlistRoute.HandleFunc("/{playlistId}", handler.GetPlayListById).Methods("GET")
-	playlistRoute.HandleFunc("/{playlistId}", handler.UpdatePlayListById).Methods("PUT")
+	playlistRoute.HandleFunc("/{playlistId}", handler.UpdatePlayListById).Methods("PATCH")
 	playlistRoute.HandleFunc("/{playlistId}", handler.DeletePlayListById).Methods("DELETE")
-	playlistRoute.HandleFunc("/{playlistId}/share/{userId}", handler.SharePlaylistToUser).Methods("POST")
+	playlistRoute.HandleFunc("/share", handler.SharePlaylistToUser).Methods("POST")
+	playlistRoute.HandleFunc("/copy/{playlistId}", handler.CopyPlayListById).Methods("POST")
+	playlistRoute.HandleFunc("/{playlistId}/remove/{userId}", handler.RemoveAccessToUser).Methods("DELETE")
 	playlistRoute.HandleFunc("/{playlistId}/movie/{movieId}", handler.AddMovieToPlaylist).Methods("POST")
 	playlistRoute.HandleFunc("/{playlistId}/movie/{movieId}", handler.RemoveMovieFromPlaylist).Methods("DELETE")
 

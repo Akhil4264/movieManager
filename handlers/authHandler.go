@@ -176,7 +176,7 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 func CheckHandler(w http.ResponseWriter,r *http.Request){
 	user,err := userRepository.GetUserFromRequest(r)
 	if(err != nil){
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	if(user != nil){

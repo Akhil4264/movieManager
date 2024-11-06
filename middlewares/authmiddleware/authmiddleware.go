@@ -2,7 +2,6 @@ package authmiddleware
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -43,12 +42,12 @@ func VerifyToken(accessToken string) (jwt.MapClaims, error) {
 	return claims, nil
 }
 
-func HandleClaims(r *http.Request) (*jwt.MapClaims, error) {
+func HandleClaims(r *http.Request) (*jwt.MapClaims) {
 	claims, ok := r.Context().Value(claimsKey).(jwt.MapClaims)
 	if(!ok){
-		return nil,errors.New("no Token Found")
+		return nil
 	}
-	return &claims,nil
+	return &claims
 }
 
 func HandleClaimsAuthRoute(r *http.Request) (jwt.MapClaims, bool) {

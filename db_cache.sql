@@ -19,7 +19,7 @@ CREATE TABLE Users (
 
 CREATE TABLE Playlist (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(50) UNIQUE NOT NULL,
+    name VARCHAR(255) NOT NULL,
     shareAccess access NOT NULL,
     ownerId INTEGER NOT NULL,
     createdOn BIGINT NOT NULL,
@@ -35,12 +35,12 @@ CREATE TABLE Movie (
     Rated VARCHAR(10),
     Released VARCHAR(255),
     Runtime VARCHAR(10),
-    Genre VARCHAR(100),
-    Director VARCHAR(100),
-    Writer VARCHAR(100),
+    Genre VARCHAR(255),
+    Director VARCHAR(255),
+    Writer VARCHAR(255),
     Actors VARCHAR(255),
     Plot TEXT,
-    Language VARCHAR(100),
+    Language VARCHAR(255),
     Country VARCHAR(100),
     Awards VARCHAR(255),
     Poster VARCHAR(255),
@@ -91,9 +91,7 @@ CREATE TABLE userPlaylist (
   user_id INTEGER NOT NULL,
   playlist_id INTEGER NOT NULL,
   writeAccess BOOLEAN DEFAULT false,
-  -- add primary key 
   PRIMARY KEY (user_id,playlist_id)
-  --
   CONSTRAINT userPlaylist_user_id_fkey FOREIGN KEY (user_id)
     REFERENCES Users(id) MATCH SIMPLE
     ON UPDATE NO ACTION ON DELETE NO ACTION,
@@ -106,22 +104,10 @@ CREATE TABLE userPlaylist (
 
 
 
-select movie.*,ratings.id as ratingId,ratings.source as source,ratings.value as value from movie 
-join
-ratings
-on 
-ratings.movieId = movie.Imdbid
 
 
--- tt0499549
 
-SELECT row_to_json(movieratings)
-FROM 
-(SELECT m.*
-, COALESCE((SELECT json_agg(r) FROM ratings r WHERE r.movieId = 'tt0499549')
-, '[]') AS ratings movie m WHERE m.imdbID = 'tt0499549') 
-AS 
-movieratings;
+
 
 
 
